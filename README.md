@@ -72,7 +72,8 @@ Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
 
    ```sh
    gcloud container clusters create-auto online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
+     --project=${PROJECT_ID} --region=${REGION} \
+     --labels dev-tutorial=online-boutique
    ```
 
    Creating the cluster may take a few minutes.
@@ -140,6 +141,8 @@ Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
 
 ## Demos featuring Online Boutique
 
+- [Security hardening of the OnlineBoutique sample apps with the Docker Hardened Images (DHI)](https://medium.com/google-cloud/security-hardening-of-the-onlineboutique-sample-apps-with-docker-hardened-images-dhi-ca1fad348343)
+- [alpine, distroless or scratch?](https://medium.com/google-cloud/alpine-distroless-or-scratch-caac35250e0b)
 - [Platform Engineering in action: Deploy the Online Boutique sample apps with Score and Humanitec](https://medium.com/p/d99101001e69)
 - [The new Kubernetes Gateway API with Istio and Anthos Service Mesh (ASM)](https://medium.com/p/9d64c7009cd)
 - [Use Azure Redis Cache with the Online Boutique sample on AKS](https://medium.com/p/981bd98b53f8)
@@ -164,3 +167,4 @@ Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
   - [Introduction to Service Management with Istio](https://www.youtube.com/watch?v=wCJrdKdD6UM&feature=youtu.be&t=586)
 - [Google Cloud Next'18 London – Keynote](https://youtu.be/nIq2pkNcfEI?t=3071)
   showing Stackdriver Incident Response Management
+- [Microservices demo showcasing Go Micro](https://github.com/go-micro/demo)

@@ -25,9 +25,18 @@ const logger = pino({
   }
 });
 
-
-logger.info("Profiler disabled.")
-
+if(process.env.DISABLE_PROFILER) {
+  logger.info("Profiler disabled.")
+}
+else {
+  logger.info("Profiler enabled.")
+  require('@google-cloud/profiler').start({
+    serviceContext: {
+      service: 'currencyservice',
+      version: '1.0.0'
+    }
+  });
+}
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
@@ -38,76 +47,32 @@ registerInstrumentations({
   instrumentations: [new GrpcInstrumentation()]
 });
 
-// ---- OTel setup (Tracing stays conditional; Metrics always exposed via Prometheus) ----
-const { resourceFromAttributes } = require('@opentelemetry/resources');
-const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
-const opentelemetry = require('@opentelemetry/sdk-node');
-const { PrometheusExporter } = require('@opentelemetry/exporter-prometheus');
+if(process.env.ENABLE_TRACING == "1") {
+  logger.info("Tracing enabled.")
 
-const serviceName = process.env.OTEL_SERVICE_NAME || 'currencyservice';
+  const { resourceFromAttributes } = require('@opentelemetry/resources');
 
-// Prometheus metrics endpoint (starts its own HTTP server)
-const METRICS_PORT = Number(process.env.METRICS_PORT || 9464);
-const METRICS_PATH = process.env.METRICS_PATH || '/metrics';
-const prometheusExporter = new PrometheusExporter(
-  { port: METRICS_PORT, endpoint: METRICS_PATH },
-  () => console.log(`Prometheus metrics exposed at :${METRICS_PORT}${METRICS_PATH}`)
-);
+  const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
 
-// Build NodeSDK options once; attach tracing exporter only if enabled
-const sdkOptions = {
-  resource: resourceFromAttributes({ [ATTR_SERVICE_NAME]: serviceName }),
-  // Prometheus exporter acts as a MetricReader
-  metricReader: prometheusExporter
-};
+  const opentelemetry = require('@opentelemetry/sdk-node');
 
-if (process.env.ENABLE_TRACING == "1") {
-  logger.info("Tracing enabled.");
   const { OTLPTraceExporter } = require('@opentelemetry/exporter-otlp-grpc');
+
   const collectorUrl = process.env.COLLECTOR_SERVICE_ADDR;
-  sdkOptions.traceExporter = new OTLPTraceExporter({ url: collectorUrl });
-} else {
-  logger.info("Tracing disabled.");
+  const traceExporter = new OTLPTraceExporter({url: collectorUrl});
+  const sdk = new opentelemetry.NodeSDK({
+    resource: resourceFromAttributes({
+      [ ATTR_SERVICE_NAME ]: process.env.OTEL_SERVICE_NAME || 'currencyservice',
+    }),
+    traceExporter: traceExporter,
+  });
+
+  sdk.start()
+}
+else {
+  logger.info("Tracing disabled.")
 }
 
-// Start OTel (metrics always on; tracing if enabled)
-const sdk = new opentelemetry.NodeSDK(sdkOptions);
-try {
-  sdk.start();
-} catch (err) {
-  console.error("Failed to start OpenTelemetry SDK:", err);
-}
-
-// ---- Minimal OTel metrics so Prom sees data ----
-const { metrics } = require('@opentelemetry/api');
-const meter = metrics.getMeter('app-meter');
-
-// 1) Always-on “up” gauge (1 = healthy)
-const upGauge = meter.createObservableGauge('app_up', { description: 'Application liveness (1=up)' });
-upGauge.addCallback(result => result.observe(1));
-
-// 2) Process RSS in bytes
-const rssGauge = meter.createObservableGauge('process_resident_memory_bytes', { description: 'Resident set size' });
-rssGauge.addCallback(result => {
-  const rss = process.memoryUsage().rss;
-  result.observe(rss);
-});
-
-// 3) (Optional) simple heartbeat counter so you can see it tick
-const heartbeat = meter.createCounter('app_heartbeat_total', { description: 'Periodic heartbeat' });
-setInterval(() => heartbeat.add(1, { service: process.env.OTEL_SERVICE_NAME || 'paymentservice' }), 10000);
-
-// 4) (Optional) gRPC instruments you can wire into handlers
-const grpcReqs = meter.createCounter('grpc_server_requests_total', {
-  description: 'Total gRPC requests',
-});
-const grpcLatency = meter.createHistogram('grpc_server_request_duration_seconds', {
-  description: 'gRPC request duration',
-  unit: 's',
-  boundaries: [0.003,0.01,0.025,0.05,0.1,0.25,0.5,1,2.5,5,10],
-});
-
-// ---- Your existing app code below ----
 const path = require('path');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
@@ -119,7 +84,6 @@ const PORT = process.env.PORT;
 
 const shopProto = _loadProto(MAIN_PROTO_PATH).hipstershop;
 const healthProto = _loadProto(HEALTH_PROTO_PATH).grpc.health.v1;
-
 
 /**
  * Helper function that loads a protobuf file.
@@ -222,7 +186,7 @@ function main () {
   server.addService(healthProto.Health.service, {check});
 
   server.bindAsync(
-    `0.0.0.0:${PORT}`,
+    `[::]:${PORT}`,
     grpc.ServerCredentials.createInsecure(),
     function() {
       logger.info(`CurrencyService gRPC server started on port ${PORT}`);
@@ -232,4 +196,3 @@ function main () {
 }
 
 main();
-

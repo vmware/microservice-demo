@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-# require('@google-cloud/trace-agent').start();
+require('@google-cloud/trace-agent').start();
 
 const path = require('path');
 const grpc = require('grpc');
@@ -66,4 +66,3 @@ client.convert(request, (err, response) => {
     logger.log(`Convert: ${_moneyToString(request.from)} to ${_moneyToString(response)}`);
   }
 });
-

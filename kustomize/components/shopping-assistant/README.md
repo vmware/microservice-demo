@@ -1,6 +1,6 @@
 # Shopping Assistant with RAG & AlloyDB
 
-This demo adds a new service to Online Boutique called `shoppingassistantservice` which, alongside an Alloy-DB backed products catalog, adds a RAG-featured AI assistant to the frontned experience, helping users suggest products matching their home decor.
+This demo adds a new service to Online Boutique called `shoppingassistantservice` which, alongside an Alloy-DB backed products catalog, adds a RAG-featured AI assistant to the frontend experience, helping users suggest products matching their home decor.
 
 ## Setup instructions
 
@@ -30,7 +30,8 @@ This demo adds a new service to Online Boutique called `shoppingassistantservice
 1. Create a GKE Autopilot cluster. This may take a few minutes.
     ```sh
     gcloud container clusters create-auto cymbal-shops \
-        --region=us-central1
+        --region=us-central1 \
+        --labels dev-tutorial=online-boutique
     ```
 
 1. Change your Kubernetes context to your newly created GKE cluster.

@@ -12,35 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Define a default value so it's not empty if the builder fails to provide it
+ARG BUILDPLATFORM=linux/amd64
 
-# ---------- builder ----------
-FROM dockerhub.packages.vcfd.broadcom.net/node:20.18.1-bookworm-slim AS builder
-# RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \#
-# && rm -rf /var/lib/apt/lists/*
+FROM --platform=$BUILDPLATFORM node:24.20.0-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS builder
+
+# Some packages (e.g. @google-cloud/profiler) require additional
+# deps for post-install scripts
+RUN apk add --update --no-cache \
+    python3 \
+    make \
+    g++
+
 WORKDIR /usr/src/app
 
-# Use your proxy for this build
-RUN printf "registry=https://packages.vcfd.broadcom.net/artifactory/api/npm/upstream-reg-npm-virtual\nfund=false\naudit=false\n" > .npmrc
-
-# Copy only lock files first for cacheable installs
 COPY package*.json ./
 
-# If your lock still has public URLs, rewrite them once:
-RUN npm install --package-lock-only
+RUN npm install --only=production
 
-# Install exactly what's in the lock
-RUN npm ci --omit=dev
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
-# (optional) sanity check
-RUN node -e "require('pino'); console.log('pino OK')"
+RUN apk add --no-cache nodejs
 
-# ---------- runtime ----------
-FROM dockerhub.packages.vcfd.broadcom.net/alpine:3.20.3
-RUN apk add --no-cache nodejs ca-certificates
 WORKDIR /usr/src/app
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/package*.json ./
-COPY . .
-EXPOSE 50051
-ENTRYPOINT ["node","index.js"]
 
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+
+COPY . .
+
+EXPOSE 50051
+
+ENTRYPOINT [ "node", "index.js" ]
